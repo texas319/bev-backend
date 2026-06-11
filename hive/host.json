@@ -1,0 +1,27 @@
+{
+  "version": "2.0",
+  "logging": {
+    "fileLoggingMode": "always",
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": false
+      },
+      "enableLiveMetricsFilters": true
+    },
+    "logLevel": {
+      "default": "Information",
+      "Host.Aggregator": "Trace",
+      "Host.Results": "Trace",
+      "Function": "Trace",
+      "Worker": "Trace",
+      "Microsoft.Azure.Functions.Worker": "Trace",
+      "BEV.Hive": "Trace"
+    }
+  },
+  "extensions": {
+    "http": {
+      "routePrefix": "v1"
+    }
+  },
+  "functionTimeout": "00:00:45"
+}

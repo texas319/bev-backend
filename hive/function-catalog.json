@@ -1,0 +1,615 @@
+{
+  "catalog_version": "1.1",
+  "date": "2026-06-04",
+  "owner": "NEXUS Team",
+  "principle": "Every remote-callable method NEXUS or EAGLE exposes. Pairs with BEV Panel Registry.json (the read plane). Functions are the WRITE / CONTROL plane.",
+  "invoke_envelope": {
+    "function_id": "string  (matches an id below)",
+    "args": "object  (per the function's args schema)",
+    "request_id": "string  (server-assigned, echoed in response)",
+    "actor": "string  (dashboard email from JWT \u2014 server stamps, not client)",
+    "ts_utc": "ISO-8601 string"
+  },
+  "ack_envelope": {
+    "request_id": "string",
+    "function_id": "string",
+    "status": "ok | error | pending",
+    "result": "object | null",
+    "error": "string | null",
+    "ts_utc": "ISO-8601 string"
+  },
+  "tiers": {
+    "read": "no state change \u2014 anyone entitled to the fleet can call",
+    "write": "mutates per-account state \u2014 entitled + audit-logged",
+    "nuclear": "halts/flattens at scale \u2014 entitled + explicit confirm step + audit + announcement frame to all subscribers"
+  },
+  "audit": "EVERY non-read invocation writes a row to the EAGLE audit log (PART 37 P37_LogEvent) AND the Server audit pipeline. The actor email is non-falsifiable (server-stamped from JWT).",
+  "scoping": {
+    "rule": "Args containing an account or fleet_id are checked against the JWT's fleet_ids on every call \u2014 out-of-scope = 403, no execution.",
+    "nuclear_extra": "Nuclear-tier calls require args.confirm == true AND a second confirm round-trip (server replies status=pending with a confirm_token; client repeats the call with confirm_token)."
+  },
+  "functions": [
+    {
+      "function_id": "read.accounts.list",
+      "label": "List all NT8 accounts on the box",
+      "category": "read",
+      "tier": "read",
+      "args": {},
+      "returns": "row_set:amc_account_row",
+      "underlying": "NinjaTrader.Cbi.Account.All (filtered to entitled fleets)"
+    },
+    {
+      "function_id": "read.account.state",
+      "label": "Full account snapshot",
+      "category": "read",
+      "tier": "read",
+      "args": {
+        "account": "string"
+      },
+      "returns": "amc_account_row",
+      "underlying": "Account.Get(NetLiquidation/CashValue/Realized/Unrealized)"
+    },
+    {
+      "function_id": "read.account.positions",
+      "label": "Open positions for an account",
+      "category": "read",
+      "tier": "read",
+      "args": {
+        "account": "string"
+      },
+      "returns": "row_set:{instrument,qty,side,avg_price,unreal_usd}",
+      "underlying": "Account.Positions walk"
+    },
+    {
+      "function_id": "read.account.pnl",
+      "label": "Account P&L today",
+      "category": "read",
+      "tier": "read",
+      "args": {
+        "account": "string"
+      },
+      "returns": "object{realized_usd,unreal_usd,day_pnl_usd}",
+      "underlying": "AMC PnlEngine.GetState"
+    },
+    {
+      "function_id": "read.strategies.list",
+      "label": "All live EAGLE instances",
+      "category": "read",
+      "tier": "read",
+      "args": {},
+      "returns": "row_set:instance_row",
+      "underlying": "StrategyBase.cacheList walk + status.json reader"
+    },
+    {
+      "function_id": "read.strategy.state",
+      "label": "One strategy's runtime state",
+      "category": "read",
+      "tier": "read",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "object{state,iid,build,trace_mode,realized_usd,unreal_usd,position}",
+      "underlying": "BEV_LiveLink.All() lookup"
+    },
+    {
+      "function_id": "read.strategy.settings",
+      "label": "Per-instance EAGLE settings",
+      "category": "read",
+      "tier": "read",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "object (key/value snapshot)",
+      "underlying": "Strategy property reflection (snapshot only)"
+    },
+    {
+      "function_id": "read.levels.snapshot",
+      "label": "All level values for an instance",
+      "category": "read",
+      "tier": "read",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "object (level_id -> value, per BEV Level Catalog.json)",
+      "underlying": "EAGLE PART 29n level computations + indicator reads"
+    },
+    {
+      "function_id": "read.audit.tail",
+      "label": "Recent audit/log events",
+      "category": "read",
+      "tier": "read",
+      "args": {
+        "account": "string?",
+        "limit": "int?"
+      },
+      "returns": "row_set:feed_row",
+      "underlying": "PART 37 audit log tail"
+    },
+    {
+      "function_id": "control.instance.enable",
+      "label": "Re-enable a killed/disabled instance",
+      "category": "control.lifecycle",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "BEVxNEXUS_KillSignals.ReleaseInstance + NT8 SetState(Active)"
+    },
+    {
+      "function_id": "control.instance.disable",
+      "label": "Disable an instance",
+      "category": "control.lifecycle",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "NT8 SetState(Disabled)"
+    },
+    {
+      "function_id": "control.instance.kill",
+      "label": "Engage scoped kill flag for instance",
+      "category": "control.kill",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "BEVxNEXUS_KillSignals.EngageInstance -> EAGLE PART 81 reads flag"
+    },
+    {
+      "function_id": "control.instance.release",
+      "label": "Release scoped kill flag",
+      "category": "control.kill",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "BEVxNEXUS_KillSignals.ReleaseInstance"
+    },
+    {
+      "function_id": "control.instance.restart",
+      "label": "Disable -> Active cycle (re-init)",
+      "category": "control.lifecycle",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "NT8 SetState(Disabled) then SetState(Active)"
+    },
+    {
+      "function_id": "control.instance.reload_data",
+      "label": "ReloadAllHistoricalData on instance",
+      "category": "control.lifecycle",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "NT8 Strategy.ReloadAllHistoricalData()"
+    },
+    {
+      "function_id": "control.positions.flatten_instance",
+      "label": "Close positions for one instance",
+      "category": "control.trade",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "Strategy.ExitLong/ExitShort on the instance position"
+    },
+    {
+      "function_id": "control.positions.flatten_account",
+      "label": "Flatten ALL positions on one account",
+      "category": "control.trade",
+      "tier": "write",
+      "args": {
+        "account": "string"
+      },
+      "returns": "ack",
+      "underlying": "Account.Positions walk -> close each via NT8"
+    },
+    {
+      "function_id": "control.orders.cancel_all_account",
+      "label": "Cancel all working orders on account",
+      "category": "control.trade",
+      "tier": "write",
+      "args": {
+        "account": "string"
+      },
+      "returns": "ack",
+      "underlying": "Account.Orders walk -> CancelOrder each"
+    },
+    {
+      "function_id": "control.amc.arm",
+      "label": "Arm an account (checkbox)",
+      "category": "control.amc",
+      "tier": "write",
+      "args": {
+        "account": "string"
+      },
+      "returns": "ack",
+      "underlying": "BEVxNEXUS_AMC_Operator state machine"
+    },
+    {
+      "function_id": "control.amc.disarm",
+      "label": "Disarm an account",
+      "category": "control.amc",
+      "tier": "write",
+      "args": {
+        "account": "string"
+      },
+      "returns": "ack",
+      "underlying": "BEVxNEXUS_AMC_Operator state machine"
+    },
+    {
+      "function_id": "control.amc.set_role",
+      "label": "Assign Leader/Follower/Unassigned",
+      "category": "control.amc",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "role": "enum{Leader,Follower,Unassigned}"
+      },
+      "returns": "ack",
+      "underlying": "AMC Registry role assignment"
+    },
+    {
+      "function_id": "control.amc.set_group",
+      "label": "Move account to group",
+      "category": "control.amc",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "group": "string"
+      },
+      "returns": "ack",
+      "underlying": "AMC GroupName assignment"
+    },
+    {
+      "function_id": "control.amc.pause_replication",
+      "label": "Pause replication for account",
+      "category": "control.amc",
+      "tier": "write",
+      "args": {
+        "account": "string"
+      },
+      "returns": "ack",
+      "underlying": "AMC Replicator pause flag"
+    },
+    {
+      "function_id": "control.amc.resume_replication",
+      "label": "Resume replication for account",
+      "category": "control.amc",
+      "tier": "write",
+      "args": {
+        "account": "string"
+      },
+      "returns": "ack",
+      "underlying": "AMC Replicator pause flag"
+    },
+    {
+      "function_id": "control.risk.set_account_loss",
+      "label": "Set account loss cap",
+      "category": "control.risk",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "usd": "number"
+      },
+      "returns": "ack",
+      "underlying": "AMC RiskSettings.AccountLossLimit"
+    },
+    {
+      "function_id": "control.risk.set_account_goal",
+      "label": "Set account profit goal",
+      "category": "control.risk",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "usd": "number"
+      },
+      "returns": "ack",
+      "underlying": "AMC RiskSettings.DailyGoalLimit"
+    },
+    {
+      "function_id": "control.risk.set_daily_loss",
+      "label": "Set instance daily-loss cap",
+      "category": "control.risk",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "usd": "number"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE per-instance daily_loss_usd"
+    },
+    {
+      "function_id": "control.risk.set_daily_goal",
+      "label": "Set instance daily-goal",
+      "category": "control.risk",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "usd": "number"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE per-instance daily_goal_usd"
+    },
+    {
+      "function_id": "control.risk.set_max_contracts",
+      "label": "Set global max concurrent contracts",
+      "category": "control.risk",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "n": "int"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE G_MaxConcurrentContracts (per-instance)"
+    },
+    {
+      "function_id": "control.session.halt",
+      "label": "Engage session halt on instance",
+      "category": "control.session",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE G_SessionHalt flag"
+    },
+    {
+      "function_id": "control.session.unhalt",
+      "label": "Clear session halt on instance",
+      "category": "control.session",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE G_SessionHalt flag"
+    },
+    {
+      "function_id": "control.mode.trace_enter",
+      "label": "Enter trace mode on instance",
+      "category": "control.mode",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE G_TraceMode toggle"
+    },
+    {
+      "function_id": "control.mode.trace_exit",
+      "label": "Exit trace mode on instance",
+      "category": "control.mode",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE G_TraceMode toggle"
+    },
+    {
+      "function_id": "control.mode.phoenix",
+      "label": "Set Phoenix risk tolerance",
+      "category": "control.mode",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "tolerance": "enum{Conservative,Moderate,Aggressive,Off}"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE Phoenix setting"
+    },
+    {
+      "function_id": "control.mode.dragon",
+      "label": "Set Dragon risk tolerance",
+      "category": "control.mode",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "tolerance": "enum{Conservative,Moderate,Aggressive,Off}"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE Dragon setting"
+    },
+    {
+      "function_id": "control.family.enable",
+      "label": "Enable/disable a trade family",
+      "category": "control.family",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "family": "enum{SUP,TRN,STR,PAC,PBK,QTR,OHL,RET,ADR,BRK,CON}",
+        "enabled": "bool"
+      },
+      "returns": "ack",
+      "underlying": "EAGLE PXX_Enable property"
+    },
+    {
+      "function_id": "control.family.set_setting",
+      "label": "Generic family setting setter",
+      "category": "control.family",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "family": "string",
+        "key": "string",
+        "value": "any"
+      },
+      "returns": "ack",
+      "underlying": "Reflection on EAGLE strategy property by name"
+    },
+    {
+      "function_id": "control.strategy.set_setting",
+      "label": "Generic strategy property setter",
+      "category": "control.strategy",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "instrument": "string",
+        "key": "string",
+        "value": "any"
+      },
+      "returns": "ack",
+      "underlying": "Reflection on EAGLE strategy property by name (allow-listed keys only)"
+    },
+    {
+      "function_id": "control.kill.engage_all",
+      "label": "KILL ALL \u2014 engage global kill",
+      "category": "control.kill",
+      "tier": "nuclear",
+      "args": {
+        "confirm": "bool",
+        "confirm_token": "string?"
+      },
+      "returns": "ack",
+      "underlying": "BEVxNEXUS_KillSignals.EngageAll -> DISABLE.flag, EAGLE PART 81 reads it"
+    },
+    {
+      "function_id": "control.kill.release_all",
+      "label": "Release global kill",
+      "category": "control.kill",
+      "tier": "nuclear",
+      "args": {
+        "confirm": "bool",
+        "confirm_token": "string?"
+      },
+      "returns": "ack",
+      "underlying": "BEVxNEXUS_KillSignals.ReleaseAll"
+    },
+    {
+      "function_id": "control.positions.flatten_fleet",
+      "label": "FLATTEN ALL \u2014 every account in fleet",
+      "category": "control.trade",
+      "tier": "nuclear",
+      "args": {
+        "fleet_id": "string",
+        "confirm": "bool",
+        "confirm_token": "string?"
+      },
+      "returns": "ack",
+      "underlying": "Walk fleet -> Account.Positions -> close each"
+    },
+    {
+      "function_id": "control.session.halt_fleet",
+      "label": "Halt entire fleet",
+      "category": "control.session",
+      "tier": "nuclear",
+      "args": {
+        "fleet_id": "string",
+        "confirm": "bool",
+        "confirm_token": "string?"
+      },
+      "returns": "ack",
+      "underlying": "Fan-out G_SessionHalt across fleet"
+    },
+    {
+      "function_id": "control.amc.set_copy",
+      "label": "Enable/disable copy participation",
+      "category": "control.amc",
+      "tier": "write",
+      "args": {
+        "account": "string",
+        "enabled": "bool"
+      },
+      "returns": "ack",
+      "underlying": "AMC copy_state config attribute (distinct from pause_replication runtime halt)"
+    },
+    {
+      "function_id": "control.kill.engage_cube",
+      "label": "KILL CUBE \u2014 engage kill on one cube",
+      "category": "control.kill",
+      "tier": "nuclear",
+      "args": {
+        "mid": "string",
+        "confirm": "bool",
+        "confirm_token": "string?"
+      },
+      "returns": "ack",
+      "underlying": "Hive fans kill flag to all instances on the target mid"
+    },
+    {
+      "function_id": "control.positions.flatten_cube",
+      "label": "FLATTEN CUBE \u2014 every account on one cube",
+      "category": "control.positions",
+      "tier": "nuclear",
+      "args": {
+        "mid": "string",
+        "confirm": "bool",
+        "confirm_token": "string?"
+      },
+      "returns": "ack",
+      "underlying": "Hive fans flatten to all accounts on the target mid"
+    },
+    {
+      "function_id": "control.session.halt_cube",
+      "label": "Halt one cube",
+      "category": "control.session",
+      "tier": "nuclear",
+      "args": {
+        "mid": "string",
+        "confirm": "bool",
+        "confirm_token": "string?"
+      },
+      "returns": "ack",
+      "underlying": "Fan-out G_SessionHalt across the target mid's instances"
+    },
+    {
+      "function_id": "control.seven.proposal_accept",
+      "label": "Accept a Seven proposal",
+      "category": "control.seven",
+      "tier": "write",
+      "args": {
+        "proposal_id": "string"
+      },
+      "returns": "ack",
+      "underlying": "Routes operator acceptance of a Phoenix/Dragon proposal"
+    },
+    {
+      "function_id": "control.seven.proposal_reject",
+      "label": "Reject a Seven proposal",
+      "category": "control.seven",
+      "tier": "write",
+      "args": {
+        "proposal_id": "string"
+      },
+      "returns": "ack",
+      "underlying": "Routes operator rejection of a Seven proposal"
+    }
+  ],
+  "notes": [
+    "All control.* functions are ADDITIVE to existing UI controls (the AMC arm checkbox, KILL ALL button, Strategies panel ENABLE/KILL buttons remain \u2014 server functions are a parallel rail to the same actions).",
+    "EAGLE editing boundaries (PART 36/37/82 only, do-not-touch list) from the reader's guide still apply. The remote surface uses the EXISTING wiring \u2014 the underlying methods above are already implemented in EAGLE/NEXUS; we are EXPOSING them, not building new behavior.",
+    "Allow-listed strategy properties for control.strategy.set_setting / control.family.set_setting will be enumerated and shared before wiring (read-only intersection with G_* globals and PXX_* family settings; trade-logic internals are not callable).",
+    "Confirm-token flow for nuclear tier: client calls with confirm=true and no token -> server returns status=pending with confirm_token (60s TTL) + announcement frame to fleet subscribers; client repeats call with confirm_token -> server executes. Two-round-trip is intentional friction for catastrophic ops."
+  ]
+}

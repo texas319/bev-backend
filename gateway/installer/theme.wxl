@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<WixLocalization Culture="en-us" xmlns="http://wixtoolset.org/schemas/v4/wxl">
+  <String Id="Caption" Value="Nexus Gateway Setup" />
+  <String Id="Title" Value="NEXUS GATEWAY" />
+  <String Id="ConfirmCancelMessage" Value="Cancel the Nexus Gateway installation?" />
+  <String Id="HelpHeader" Value="Setup Help" />
+  <String Id="HelpText" Value="/install | /repair | /uninstall | /layout [directory] - installs, repairs, uninstalls or creates a local copy. /passive | /quiet - displays minimal or no UI. /norestart - suppresses any restarts. /log log.txt - logs to a file." />
+  <String Id="HelpCloseButton" Value="&amp;Close" />
+  <String Id="InstallHeader" Value="NEXUS GATEWAY" />
+  <String Id="InstallMessage" Value="Installs the Nexus Gateway service and tray helper on this machine. The .NET 8 Desktop Runtime is included and will be installed if missing." />
+  <String Id="InstallVersion" Value="Build [WixBundleVersion]" />
+  <String Id="InstallLicenseLinkText" Value="" />
+  <String Id="InstallAcceptCheckbox" Value="" />
+  <String Id="InstallInstallButton" Value="&amp;Install" />
+  <String Id="InstallCloseButton" Value="&amp;Close" />
+  <String Id="ProgressHeader" Value="INSTALLING" />
+  <String Id="ProgressLabel" Value="Processing:" />
+  <String Id="OverallProgressPackageText" Value="Initializing..." />
+  <String Id="ProgressCancelButton" Value="&amp;Cancel" />
+  <String Id="ModifyHeader" Value="NEXUS GATEWAY" />
+  <String Id="ModifyRepairButton" Value="&amp;Repair" />
+  <String Id="ModifyUninstallButton" Value="&amp;Uninstall" />
+  <String Id="ModifyCloseButton" Value="&amp;Close" />
+  <String Id="SuccessRepairHeader" Value="REPAIR COMPLETE" />
+  <String Id="SuccessUninstallHeader" Value="UNINSTALL COMPLETE" />
+  <String Id="SuccessInstallHeader" Value="INSTALL COMPLETE" />
+  <String Id="SuccessHeader" Value="COMPLETE" />
+  <String Id="SuccessLaunchButton" Value="&amp;Launch" />
+  <String Id="SuccessRestartText" Value="You must restart to complete setup." />
+  <String Id="SuccessRestartButton" Value="&amp;Restart" />
+  <String Id="SuccessCloseButton" Value="&amp;Close" />
+  <String Id="SuccessInstallMessage" Value="Nexus Gateway is installed. The setup window will open to finish provisioning this node." />
+  <String Id="FailureHeader" Value="SETUP FAILED" />
+  <String Id="FailureInstallHeader" Value="INSTALL FAILED" />
+  <String Id="FailureUninstallHeader" Value="UNINSTALL FAILED" />
+  <String Id="FailureRepairHeader" Value="REPAIR FAILED" />
+  <String Id="FailureHyperlinkLogText" Value="One or more issues caused setup to fail. Review the [log file] for detail." />
+  <String Id="FailureRestartText" Value="You must restart to complete the rollback." />
+  <String Id="FailureRestartButton" Value="&amp;Restart" />
+  <String Id="FailureCloseButton" Value="&amp;Close" />
+</WixLocalization>

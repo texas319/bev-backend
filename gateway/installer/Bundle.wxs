@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Bundle Name="Nexus Gateway"
+          Manufacturer="BEV Systems"
+          Version="0.1.0.0"
+          UpgradeCode="C1D2E3F4-5678-4901-2345-6789ABCDEF01"
+          IconSourceFile="nexus.ico">
+
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication
+          ThemeFile="theme.xml"
+          LocalizationFile="theme.wxl"
+          LogoFile="nexus-logo.png" />
+    </BootstrapperApplication>
+
+    <!-- Detect whether the .NET 8 Desktop Runtime (x64) is present. -->
+    <util:RegistrySearch
+        Id="DetectNetDesktop8"
+        Variable="DotNetDesktop8Detected"
+        Root="HKLM"
+        Key="SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App"
+        Result="exists" />
+
+    <Chain>
+      <!-- .NET 8 Desktop Runtime. Installed only if absent. -->
+      <ExePackage
+          Id="DotNetDesktop8"
+          DisplayName="Microsoft .NET 8 Desktop Runtime (x64)"
+          Cache="remove"
+          PerMachine="yes"
+          Permanent="yes"
+          Vital="yes"
+          InstallArguments="/install /quiet /norestart"
+          DetectCondition="DotNetDesktop8Detected">
+        <ExePackagePayload SourceFile="redist\windowsdesktop-runtime-8-win-x64.exe" />
+      </ExePackage>
+
+      <!-- Our MSI. -->
+      <MsiPackage
+          Id="NexusGatewayMsi"
+          SourceFile="..\dist\Nexus-Gateway-Setup.msi"
+          DisplayName="Nexus Gateway"
+          Vital="yes" />
+    </Chain>
+
+  </Bundle>
+</Wix>

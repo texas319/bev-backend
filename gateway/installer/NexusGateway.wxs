@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <Package Name="Nexus Gateway"
+           Manufacturer="BEV Systems"
+           Version="1.0.10.0"
+           UpgradeCode="A8B7C6D5-1234-4567-8901-ABCDEF012345"
+           Scope="perMachine"
+           InstallerVersion="500">
+
+    <SummaryInformation Description="Nexus Gateway - telemetry + command relay for the NEXUS trading platform." />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Nexus Gateway is already installed." />
+
+    <!-- Brand icon: amber NEXUS square. Shown in Add/Remove Programs
+         (ARPPRODUCTICON) and reused on the Start Menu shortcut. -->
+    <Icon Id="NexusIcon.ico" SourceFile="!(bindpath.installer)\NexusGateway.ico" />
+    <Property Id="ARPPRODUCTICON" Value="NexusIcon.ico" />
+    <Property Id="ARPHELPLINK" Value="https://bevcloud.app" />
+    <Property Id="ARPURLINFOABOUT" Value="https://bevcloud.app" />
+
+    <Media Id="1" Cabinet="nexusgw.cab" EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLDIR" Name="Nexus Gateway" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="PROGRAMDATA_NEXUS" Name="NexusGateway">
+        <Directory Id="PROGRAMDATA_NEXUS_LOGS" Name="logs" />
+      </Directory>
+    </StandardDirectory>
+
+    <!-- ProgramData\NexusGateway writable by Users so the tray (operator
+         session) can drop the pending-provision file the Service
+         (LocalSystem) reads. -->
+    <Component Id="ProgramDataPermissions"
+               Directory="PROGRAMDATA_NEXUS"
+               Guid="A8B7C6D5-9999-4567-8901-ABCDEF012346">
+      <CreateFolder>
+        <util:PermissionEx User="Users" GenericAll="yes" />
+      </CreateFolder>
+    </Component>
+
+    <Component Id="ProgramDataLogsPermissions"
+               Directory="PROGRAMDATA_NEXUS_LOGS"
+               Guid="A8B7C6D5-AAAA-4567-8901-ABCDEF012347">
+      <CreateFolder>
+        <util:PermissionEx User="Users" GenericRead="yes" GenericExecute="yes" />
+      </CreateFolder>
+    </Component>
+
+    <!-- Service binary + registration -->
+    <Component Id="ServiceExe" Directory="INSTALLDIR" Guid="A8B7C6D5-BBBB-4567-8901-ABCDEF012348">
+      <File Id="BEVGateway.Service.exe"
+            Source="!(bindpath.service)\BEVGateway.Service.exe"
+            KeyPath="yes" />
+
+      <ServiceInstall Id="NexusGatewayServiceInstall"
+                      Name="NexusGateway"
+                      DisplayName="Nexus Gateway"
+                      Description="Nexus Gateway - telemetry + command relay between this Cube and the NEXUS platform."
+                      Type="ownProcess"
+                      Start="auto"
+                      ErrorControl="normal"
+                      Account="LocalSystem"
+                      Vital="yes">
+        <util:ServiceConfig FirstFailureActionType="restart"
+                            SecondFailureActionType="restart"
+                            ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="15"
+                            ResetPeriodInDays="1" />
+      </ServiceInstall>
+
+      <ServiceControl Id="NexusGatewayServiceControl"
+                      Name="NexusGateway"
+                      Start="install"
+                      Stop="both"
+                      Remove="uninstall"
+                      Wait="yes" />
+    </Component>
+
+    <!-- Tray helper + autorun -->
+    <Component Id="TrayExe" Directory="INSTALLDIR" Guid="A8B7C6D5-CCCC-4567-8901-ABCDEF012349">
+      <File Id="BEVGateway.Tray.exe"
+            Source="!(bindpath.tray)\BEVGateway.Tray.exe"
+            KeyPath="yes" />
+      <RegistryValue Root="HKLM"
+                     Key="Software\Microsoft\Windows\CurrentVersion\Run"
+                     Name="NexusGatewayTray"
+                     Value="&quot;[INSTALLDIR]BEVGateway.Tray.exe&quot;"
+                     Type="string" />
+    </Component>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="StartMenuNexusFolder" Name="Nexus Gateway">
+        <Component Id="StartMenuShortcut" Guid="A8B7C6D5-DDDD-4567-8901-ABCDEF01234A">
+          <Shortcut Id="TrayShortcut"
+                    Name="Nexus Gateway"
+                    Description="Launches the Nexus Gateway tray icon."
+                    Target="[INSTALLDIR]BEVGateway.Tray.exe"
+                    WorkingDirectory="INSTALLDIR"
+                    Icon="NexusIcon.ico">
+            <!-- AppUserModelID ties this shortcut to the AUMID the tray
+                 process sets at startup (BirdsEyeView.NexusGateway). With
+                 it, Windows shows toast notifications under the name
+                 "Nexus Gateway" and this icon instead of the raw process
+                 name "BEVGateway.Tray" + the generic system glyph. -->
+            <ShortcutProperty Key="System.AppUserModel.ID" Value="BirdsEyeView.NexusGateway" />
+          </Shortcut>
+          <RemoveFolder Id="RemoveStartMenuNexusFolder" On="uninstall" />
+          <RegistryValue Root="HKCU"
+                         Key="Software\BEV Systems\Nexus Gateway"
+                         Name="installed"
+                         Type="integer"
+                         Value="1"
+                         KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <!-- Launch tray after install so the first-run wizard fires. -->
+    <CustomAction Id="LaunchTrayAfterInstall"
+                  FileRef="BEVGateway.Tray.exe"
+                  ExeCommand=""
+                  Impersonate="yes"
+                  Return="asyncNoWait" />
+
+    <InstallExecuteSequence>
+      <Custom Action="LaunchTrayAfterInstall" After="InstallFinalize"
+              Condition="NOT REMOVE" />
+    </InstallExecuteSequence>
+
+    <Feature Id="ProductFeature" Title="Nexus Gateway" Level="1">
+      <ComponentRef Id="ProgramDataPermissions" />
+      <ComponentRef Id="ProgramDataLogsPermissions" />
+      <ComponentRef Id="ServiceExe" />
+      <ComponentRef Id="TrayExe" />
+      <ComponentRef Id="StartMenuShortcut" />
+      <ComponentGroupRef Id="ServiceRuntimeFiles" />
+      <ComponentGroupRef Id="TrayRuntimeFiles" />
+    </Feature>
+
+  </Package>
+
+</Wix>

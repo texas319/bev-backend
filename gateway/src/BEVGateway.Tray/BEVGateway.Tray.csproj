@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>BEVGateway.Tray</RootNamespace>
+    <AssemblyName>BEVGateway.Tray</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>NexusGateway.ico</ApplicationIcon>
+    <Product>Nexus Gateway</Product>
+    <AssemblyTitle>Nexus Gateway</AssemblyTitle>
+    <Company>Bird's Eye View</Company>
+    <Description>Nexus Gateway — BEV trading cube agent</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BEVGateway.Shared\BEVGateway.Shared.csproj" />
+  </ItemGroup>
+</Project>
